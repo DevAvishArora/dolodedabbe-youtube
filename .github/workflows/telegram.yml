@@ -1,0 +1,52 @@
+name: Telegram update
+
+on:
+  repository_dispatch:
+    types: [telegram_update]
+
+permissions:
+  contents: write
+
+jobs:
+  handle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Make sure ffmpeg is present
+        run: which ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+
+      - name: Handle update
+        env:
+          UPDATE_JSON: ${{ toJson(github.event.client_payload.update) }}
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          TG_OWNER_ID: ${{ secrets.TG_OWNER_ID }}
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          YT_API_KEY: ${{ secrets.YT_API_KEY }}
+        run: python -m pipeline.handle_update
+
+      - name: Save state
+        if: always()
+        run: |
+          git config user.name "dolladabbe-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add state
+          git diff --cached --quiet && exit 0
+          git commit -m "state: update from Telegram"
+          for attempt in 1 2 3 4 5; do
+            git pull --rebase && git push && exit 0
+            sleep $((attempt * 3))
+          done
+          exit 1
