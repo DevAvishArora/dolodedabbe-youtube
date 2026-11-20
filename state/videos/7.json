@@ -6,8 +6,52 @@
   "parts": [
     7
   ],
-  "status": "failed",
+  "status": "awaiting_approval",
   "received": "2026-11-20T13:51:26+00:00",
-  "research": "- Apple Banana Dry Fruit Smoothie 🍎🍌🥜 | Healthy & Delicious Smoothie #Shorts #jemimahskitchen | 431,571 views | 151.43x views per subscriber | tags: breakfast recipe, smoothy, best breakfast smoothie, healthy drinks, jemimahs kitchen\n- Navratri Special - Day 1:🍎Apple Smoothie  #shorts #youtubeshorts #navratri #apple #smoothie #recipe | 1,657,118 views | 77.8x views per subscriber | tags: Shorts, Healthy Apple smoothie, Navratri special recipe, Vrat recipe, Navratri fasting recipes, Smoothie, Upwas recipes, Apple juice, Refreshing apple smoothie, Milkshake, Dry fruit smoothie, Easy Vrat recipe, Homemade, Smoothie for weight loss, Fasting\n- She Cried When Her Smoothie Was Finished! 🥹🥤 | Weight Gain Smoothie for Kids #babyfood #weightgain | 1,525,203 views | 33.3x views per subscriber | tags: none\n- 39G PROTEIN BANANA CHEESECAKE SMOOTHIE 🔥🍌 #highproteinrecipes #proteinsmoothie #highprotein | 86,223 views | 19.42x views per subscriber | tags: none\n- Shaam mastani with sitafal mastani🤤 #sitafal #custurdapple #mastani #icecream #protein #shake #milk | 1,857,207 views | 6.98x views per subscriber | tags: none\n- Chocolate Oats Smoothie ❤️ | high Protein Oats Smoothie Recipe #shorts #recipe #smoothie #viralvideo | 120,408 views | 5.68x views per subscriber | tags: Smoothie, Smoothie Recipe, Chocolate Smoothie Recipe, high Protein Oats Smoothie Recipe, Chocolate Oats Smoothie, Viral recipe, easy recipe, healthy recipes, quick recipe, recipe shorts, trending recipe, trending reels, Oats recipe, Breakfast recipes, How to make smoothie at home\n- Berry Mango Oat Protein Smoothie #asmr #shorts | 210,108 views | 5.42x views per subscriber | tags: none\n- Healthy Banana Peanut Butter Protein Shake 🥛💪🔥 #shorts #asmr #peanutbutter | 749,000 views | 4.54x views per subscriber | tags: none",
-  "error": "HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): Read timed out. (read timeout=90)"
+  "research": "- Apple Banana Dry Fruit Smoothie 🍎🍌🥜 | Healthy & Delicious Smoothie #Shorts #jemimahskitchen | 431,574 views | 151.43x views per subscriber | tags: breakfast recipe, smoothy, best breakfast smoothie, healthy drinks, jemimahs kitchen\n- Navratri Special - Day 1:🍎Apple Smoothie  #shorts #youtubeshorts #navratri #apple #smoothie #recipe | 1,657,368 views | 77.81x views per subscriber | tags: Shorts, Healthy Apple smoothie, Navratri special recipe, Vrat recipe, Navratri fasting recipes, Smoothie, Upwas recipes, Apple juice, Refreshing apple smoothie, Milkshake, Dry fruit smoothie, Easy Vrat recipe, Homemade, Smoothie for weight loss, Fasting\n- She Cried When Her Smoothie Was Finished! 🥹🥤 | Weight Gain Smoothie for Kids #babyfood #weightgain | 1,525,505 views | 33.31x views per subscriber | tags: none\n- 39G PROTEIN BANANA CHEESECAKE SMOOTHIE 🔥🍌 #highproteinrecipes #proteinsmoothie #highprotein | 86,224 views | 19.42x views per subscriber | tags: none\n- Shaam mastani with sitafal mastani🤤 #sitafal #custurdapple #mastani #icecream #protein #shake #milk | 1,857,765 views | 6.98x views per subscriber | tags: none\n- Chocolate Oats Smoothie ❤️ | high Protein Oats Smoothie Recipe #shorts #recipe #smoothie #viralvideo | 120,529 views | 5.69x views per subscriber | tags: Smoothie, Smoothie Recipe, Chocolate Smoothie Recipe, high Protein Oats Smoothie Recipe, Chocolate Oats Smoothie, Viral recipe, easy recipe, healthy recipes, quick recipe, recipe shorts, trending recipe, trending reels, Oats recipe, Breakfast recipes, How to make smoothie at home\n- Berry Mango Oat Protein Smoothie #asmr #shorts | 210,389 views | 5.42x views per subscriber | tags: none\n- Healthy Banana Peanut Butter Protein Shake 🥛💪🔥 #shorts #asmr #peanutbutter | 749,139 views | 4.54x views per subscriber | tags: none",
+  "draft": {
+    "title": "Mom's Apple Protein Smoothie 🍎💪",
+    "title_alternatives": [
+      "Healthy Apple Protein Smoothie Recipe",
+      "Quick 2-Minute Apple Protein Smoothie"
+    ],
+    "hook_text": "Mom's Apple Protein Smoothie",
+    "description": "A wholesome apple protein smoothie made just like home. Quick, healthy, and nourishing.\n\n#AppleSmoothie #ProteinShake #shorts",
+    "tags": [
+      "apple smoothie",
+      "protein smoothie",
+      "healthy drinks",
+      "breakfast recipe",
+      "apple recipe",
+      "healthy shake",
+      "quick recipe",
+      "shorts",
+      "home cooking",
+      "smoothie recipe"
+    ]
+  },
+  "draft_msg_id": 23,
+  "draft_history": {
+    "23": {
+      "title": "Mom's Apple Protein Smoothie 🍎💪",
+      "title_alternatives": [
+        "Healthy Apple Protein Smoothie Recipe",
+        "Quick 2-Minute Apple Protein Smoothie"
+      ],
+      "hook_text": "Mom's Apple Protein Smoothie",
+      "description": "A wholesome apple protein smoothie made just like home. Quick, healthy, and nourishing.\n\n#AppleSmoothie #ProteinShake #shorts",
+      "tags": [
+        "apple smoothie",
+        "protein smoothie",
+        "healthy drinks",
+        "breakfast recipe",
+        "apple recipe",
+        "healthy shake",
+        "quick recipe",
+        "shorts",
+        "home cooking",
+        "smoothie recipe"
+      ]
+    }
+  }
 }
