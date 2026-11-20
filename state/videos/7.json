@@ -1,0 +1,13 @@
+{
+  "id": 7,
+  "chat": -1004371403977,
+  "dish": "Apple Protein Smoothie",
+  "mode": "final",
+  "parts": [
+    7
+  ],
+  "status": "failed",
+  "received": "2026-11-20T13:51:26+00:00",
+  "research": "- Apple Banana Dry Fruit Smoothie 🍎🍌🥜 | Healthy & Delicious Smoothie #Shorts #jemimahskitchen | 431,571 views | 151.43x views per subscriber | tags: breakfast recipe, smoothy, best breakfast smoothie, healthy drinks, jemimahs kitchen\n- Navratri Special - Day 1:🍎Apple Smoothie  #shorts #youtubeshorts #navratri #apple #smoothie #recipe | 1,657,118 views | 77.8x views per subscriber | tags: Shorts, Healthy Apple smoothie, Navratri special recipe, Vrat recipe, Navratri fasting recipes, Smoothie, Upwas recipes, Apple juice, Refreshing apple smoothie, Milkshake, Dry fruit smoothie, Easy Vrat recipe, Homemade, Smoothie for weight loss, Fasting\n- She Cried When Her Smoothie Was Finished! 🥹🥤 | Weight Gain Smoothie for Kids #babyfood #weightgain | 1,525,203 views | 33.3x views per subscriber | tags: none\n- 39G PROTEIN BANANA CHEESECAKE SMOOTHIE 🔥🍌 #highproteinrecipes #proteinsmoothie #highprotein | 86,223 views | 19.42x views per subscriber | tags: none\n- Shaam mastani with sitafal mastani🤤 #sitafal #custurdapple #mastani #icecream #protein #shake #milk | 1,857,207 views | 6.98x views per subscriber | tags: none\n- Chocolate Oats Smoothie ❤️ | high Protein Oats Smoothie Recipe #shorts #recipe #smoothie #viralvideo | 120,408 views | 5.68x views per subscriber | tags: Smoothie, Smoothie Recipe, Chocolate Smoothie Recipe, high Protein Oats Smoothie Recipe, Chocolate Oats Smoothie, Viral recipe, easy recipe, healthy recipes, quick recipe, recipe shorts, trending recipe, trending reels, Oats recipe, Breakfast recipes, How to make smoothie at home\n- Berry Mango Oat Protein Smoothie #asmr #shorts | 210,108 views | 5.42x views per subscriber | tags: none\n- Healthy Banana Peanut Butter Protein Shake 🥛💪🔥 #shorts #asmr #peanutbutter | 749,000 views | 4.54x views per subscriber | tags: none",
+  "error": "HTTPSConnectionPool(host='generativelanguage.googleapis.com', port=443): Read timed out. (read timeout=90)"
+}
