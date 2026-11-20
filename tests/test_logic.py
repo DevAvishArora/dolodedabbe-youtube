@@ -232,8 +232,10 @@ def test_final_album_stays_separate(world, monkeypatch):
     monkeypatch.setitem(__import__("sys").modules, "pipeline.media", fake)
     hu.handle(album_item(50, "Poha #final"))
     hu.handle(album_item(51))
-    statuses = {v["id"]: v["status"] for v in state.all_videos()}
-    assert statuses == {50: "awaiting_approval", 51: "awaiting_dish"}
+    vids = {v["id"]: v for v in state.all_videos()}
+    assert {i: v["status"] for i, v in vids.items()} == {
+        50: "awaiting_approval", 51: "awaiting_approval"}
+    assert vids[51]["dish"] == "Poha"  # the album caption names every reel
     assert fake.joined == []
 
 
@@ -242,3 +244,170 @@ def test_length_command(world):
     assert state.load_settings()["raw_seconds"] == 30
     hu.handle(owner("/length 5"))
     assert state.load_settings()["raw_seconds"] == 30
+
+
+class FakeResp:
+    def __init__(self, status, data=None, text=""):
+        self.status_code, self._data, self.text = status, data, text
+
+    def json(self):
+        return self._data
+
+
+def ok_body(obj):
+    return {"candidates": [{"content": {"parts": [
+        {"text": "thinking...", "thought": True},
+        {"text": "```json\n" + json.dumps(obj) + "\n```"}]}}]}
+
+
+@pytest.fixture
+def gem(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GEMINI_MODEL", "main-model")
+    monkeypatch.delenv("GEMINI_FALLBACK_MODEL", raising=False)
+    monkeypatch.setattr(writer.time, "sleep", lambda s: None)
+    calls = []
+
+    def install(responses):
+        def fake_post(model, body):
+            calls.append((model, json.loads(json.dumps(body))))
+            r = responses.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return r
+        monkeypatch.setattr(writer, "_post", fake_post)
+    return install, calls
+
+
+def test_gemini_retries_timeout_then_succeeds(gem):
+    install, calls = gem
+    install([writer.requests.Timeout(), FakeResp(200, ok_body({"title": "T"}))])
+    assert writer.ask_json("p") == {"title": "T"}
+    assert [c[0] for c in calls] == ["main-model", "main-model"]
+    assert calls[0][1]["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "low"}
+
+
+def test_gemini_drops_thinking_on_400(gem):
+    install, calls = gem
+    install([FakeResp(400, text="bad thinkingLevel"), FakeResp(200, ok_body({"a": 1}))])
+    assert writer.ask_json("p") == {"a": 1}
+    assert "thinkingConfig" not in calls[1][1]["generationConfig"]
+
+
+def test_gemini_falls_back_to_lighter_model(gem):
+    install, calls = gem
+    install([writer.requests.Timeout()] * 3 + [FakeResp(200, ok_body({"ok": True}))])
+    assert writer.ask_json("p") == {"ok": True}
+    assert calls[-1][0] == "gemini-3.5-flash-lite"
+
+
+def test_gemini_gives_clear_error(gem):
+    install, calls = gem
+    install([FakeResp(403, text="API key not valid")] * 2)
+    with pytest.raises(writer.GeminiError, match="403"):
+        writer.ask_json("p")
+
+
+def test_failure_sends_one_message_only(world, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("slow")
+    monkeypatch.setattr(hu.writer, "write_draft", boom)
+    with pytest.raises(RuntimeError) as info:
+        hu.handle(clip(31, "Idli"))
+    assert getattr(info.value, "reported", False)
+
+
+def test_empty_env_value_uses_default(monkeypatch):
+    from pipeline import config
+    monkeypatch.setenv("GEMINI_MODEL", "")  # how GitHub passes an unset repo variable
+    assert config.gemini_model() == "gemini-3.8-flash"
+    monkeypatch.setenv("TG_BOT_TOKEN", "")
+    with pytest.raises(RuntimeError, match="TG_BOT_TOKEN"):
+        config.bot_token()
+
+
+def test_gemini_timeout_after_dropping_thinking_still_retries(gem):
+    install, calls = gem
+    install([FakeResp(400, text="bad thinkingLevel"), writer.requests.Timeout(),
+             FakeResp(200, ok_body({"ok": 1}))])
+    assert writer.ask_json("p") == {"ok": 1}
+    assert [c[0] for c in calls] == ["main-model"] * 3
+    assert "thinkingConfig" not in calls[2][1]["generationConfig"]
+
+
+def test_redo_without_dish_asks_in_group(world):
+    hu.handle(owner("/pause"))
+    hu.handle(clip(60))
+    assert state.load_video(60)["status"] == "held"
+    hu.handle(owner("/resume"))
+    hu.handle(owner("/redo 60"))
+    v = state.load_video(60)
+    assert v["status"] == "awaiting_dish" and v["ask_msg_id"]
+    assert any(chat == -100123 and "Which dish" in text for chat, text in world.sent)
+    hu.handle({"message": {"message_id": 61, "chat": {"id": -100123, "type": "supergroup"},
+                           "from": {"id": 7}, "text": "Upma",
+                           "reply_to_message": {"message_id": v["ask_msg_id"]}}})
+    assert state.load_video(60)["status"] == "awaiting_approval"
+
+
+def test_ok_on_older_draft_approves_that_version(world):
+    hu.handle(clip(70, "Rajma"))
+    first = state.load_video(70)
+    hu.handle(owner("make it Hinglish", reply_to=first["draft_msg_id"]))
+    newer = state.load_video(70)
+    assert newer["draft_msg_id"] != first["draft_msg_id"]
+    hu.handle(owner("ok", reply_to=first["draft_msg_id"]))
+    v = state.load_video(70)
+    assert v["status"] == "approved"
+    assert v["draft"]["title"] == first["draft"]["title"]
+    assert world.sent[-3][1] == first["draft"]["title"]
+
+
+def test_success_clears_old_error(world, monkeypatch):
+    real = hu.writer.write_draft
+
+    def boom(*a, **k):
+        raise RuntimeError("slow")
+    monkeypatch.setattr(hu.writer, "write_draft", boom)
+    with pytest.raises(RuntimeError):
+        hu.handle(clip(80, "Kheer"))
+    monkeypatch.setattr(hu.writer, "write_draft", real)
+    hu.handle(owner("/redo 80"))
+    v = state.load_video(80)
+    assert v["status"] == "awaiting_approval" and "error" not in v
+
+
+def test_status_lists_pending_before_approved(world):
+    for i in range(1, 6):
+        hu.handle(clip(100 + i, f"Dish {i}"))
+        hu.handle(owner("ok", reply_to=state.load_video(100 + i)["draft_msg_id"]))
+    hu.handle(clip(200, "Halwa"))
+    hu.handle(owner("/status"))
+    text = world.sent[-1][1]
+    assert text.startswith("200: Halwa - awaiting_approval")
+    assert "Recently approved:" in text and "101:" not in text and "105:" in text
+
+
+def test_telegram_login_happens_once_per_run(monkeypatch):
+    import sys
+    import types
+    logins = []
+
+    class FakeClient:
+        def __init__(self, *a):
+            pass
+
+        def start(self, bot_token=None):
+            logins.append(bot_token)
+
+        def disconnect(self):
+            pass
+
+    monkeypatch.setitem(sys.modules, "telethon.sync", types.SimpleNamespace(TelegramClient=FakeClient))
+    monkeypatch.setitem(sys.modules, "telethon.sessions", types.SimpleNamespace(StringSession=lambda: None))
+    monkeypatch.setenv("TG_API_ID", "1")
+    monkeypatch.setenv("TG_API_HASH", "h")
+    monkeypatch.setenv("TG_BOT_TOKEN", "t")
+    monkeypatch.setattr(media, "_CLIENT", None)
+    assert media._client() is media._client()
+    assert logins == ["t"]

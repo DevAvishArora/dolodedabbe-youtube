@@ -32,7 +32,7 @@ writing, approval, and Telegram control.
 reports, monthly compilations. See the [roadmap](#12-roadmap). Until upload is
 built, you post each approved video by hand from the YouTube app.
 
-**Tested so far:** the logic (23 unit tests) and the video joining on sample
+**Tested so far:** the logic (35 unit tests) and the video joining on sample
 clips. The live connections to Telegram, Gemini and YouTube have not run yet,
 because they need your credentials. Expect some fixes on the first real run.
 
@@ -113,7 +113,7 @@ Rules to remember:
 
 - No tag means `#final`.
 - For several raw clips, the `#raw` tag is required. Without it each clip in
-  the album is treated as its own finished reel.
+  the album is treated as its own finished reel, all named by the album caption.
 - Clips are joined in the order they appear in the album, so select them in
   cooking order. An album holds at most 10 clips.
 - Send one dish per album.
@@ -214,7 +214,8 @@ Clip statuses you will see in `/status`:
 | What you see | Why | What to do |
 |---|---|---|
 | `Clip 123 failed: ...` | A download, edit, research or writing step broke | Send `/redo 123`. If it fails again, the error text says which service |
-| `Paused: clip 123 is held` | A clip arrived while paused | `/resume`, then `/redo 123` |
+| `Paused: clip 123 is held` | A clip arrived while paused | `/resume`, then `/redo 123` (if it had no caption, the bot asks for the dish in the group) |
+| `A pipeline run failed during setup or while saving` | GitHub could not install tools or save the clip record | Open the link in the message; send the last message or `/redo` again |
 | No reply for several minutes | GitHub Actions is slow, or the chain is broken | Check the repo's Actions tab for a failed or missing run |
 | No run appears in Actions at all | The Worker did not start it | Check the Worker's secrets and that the webhook is set (setup step 4) |
 | Bot never sees clips in the group | Privacy mode is still on | BotFather `/setprivacy` -> Disable, then remove and re-add the bot |

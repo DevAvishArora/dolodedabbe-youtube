@@ -25,6 +25,7 @@ jobs:
         run: which ffmpeg || (sudo apt-get update && sudo apt-get install -y ffmpeg)
 
       - name: Handle update
+        id: handle
         env:
           UPDATE_JSON: ${{ toJson(github.event.client_payload.update) }}
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
@@ -34,10 +35,12 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          GEMINI_FALLBACK_MODEL: ${{ vars.GEMINI_FALLBACK_MODEL }}
           YT_API_KEY: ${{ secrets.YT_API_KEY }}
         run: python -m pipeline.handle_update
 
       - name: Save state
+        id: save
         if: always()
         run: |
           git config user.name "dolladabbe-bot"
@@ -47,6 +50,21 @@ jobs:
           git commit -m "state: update from Telegram"
           for attempt in 1 2 3 4 5; do
             git pull --rebase && git push && exit 0
+            git rebase --abort 2>/dev/null || true
             sleep $((attempt * 3))
           done
           exit 1
+
+      # The bot reports its own errors. This covers the rest: setup failing
+      # before the bot runs, or the clip record not reaching GitHub.
+      - name: Tell the owner on Telegram
+        if: failure() && (steps.handle.outcome != 'failure' || steps.save.outcome == 'failure')
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_OWNER_ID: ${{ secrets.TG_OWNER_ID }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          curl -s -o /dev/null --max-time 30 \
+            --data-urlencode "chat_id=${TG_OWNER_ID}" \
+            --data-urlencode "text=A pipeline run failed during setup or while saving (save: ${{ steps.save.outcome }}). The last message may not have been handled or saved. Details: ${RUN_URL}" \
+            "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage"

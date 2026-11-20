@@ -6,6 +6,7 @@ The Bot API cannot download files over 20 MB, so files move through Telethon
 Raw clips for one dish arrive as a Telegram album. They are joined in the
 order sent, cropped to 9:16, and fitted to a target length.
 """
+import atexit
 import json
 import subprocess
 from pathlib import Path
@@ -16,24 +17,33 @@ WORK = Path("/tmp/dolladabbe")
 LOGO = Path(__file__).resolve().parent.parent / "assets" / "logo.png"
 MAX_SPEED = 4.0
 ALBUM_SPAN = 10  # Telegram albums hold at most 10 items
+_CLIENT = None
 
 
-def _client():
-    from telethon.sessions import StringSession
-    from telethon.sync import TelegramClient
+def _client():  # -> telethon.sync.TelegramClient (imported lazily)
+    """Log in once per run and reuse the connection.
 
-    client = TelegramClient(
-        StringSession(), int(config.env("TG_API_ID")), config.env("TG_API_HASH")
-    )
-    client.start(bot_token=config.bot_token())
-    return client
+    Telegram makes bots wait if they log in many times in a short period, and a
+    #raw album used to log in three times (find album, download, send back).
+    """
+    global _CLIENT
+    if _CLIENT is None:
+        from telethon.sessions import StringSession
+        from telethon.sync import TelegramClient
+
+        client = TelegramClient(
+            StringSession(), int(config.env("TG_API_ID")), config.env("TG_API_HASH")
+        )
+        client.start(bot_token=config.bot_token())
+        atexit.register(client.disconnect)
+        _CLIENT = client
+    return _CLIENT
 
 
 def fetch_album(chat: int, message_id: int) -> dict:
     """Return {'ids': [...], 'caption': str} for the album containing message_id."""
     nearby = list(range(max(1, message_id - ALBUM_SPAN), message_id + ALBUM_SPAN + 1))
-    with _client() as client:
-        msgs = [m for m in client.get_messages(chat, ids=nearby) if m]
+    msgs = [m for m in _client().get_messages(chat, ids=nearby) if m]
     me = next((m for m in msgs if m.id == message_id), None)
     if me is None or not me.grouped_id:
         return {"ids": [message_id], "caption": (me.message if me else "") or ""}
@@ -45,18 +55,17 @@ def fetch_album(chat: int, message_id: int) -> dict:
 def download_many(chat: int, message_ids: list[int]) -> list[Path]:
     WORK.mkdir(parents=True, exist_ok=True)
     paths = []
-    with _client() as client:
-        for mid in message_ids:
-            msg = client.get_messages(chat, ids=mid)
-            if msg is None or not msg.media:
-                raise RuntimeError(f"Message {mid} has no video to download")
-            paths.append(Path(client.download_media(msg, file=str(WORK / f"{mid}_raw"))))
+    client = _client()
+    for mid in message_ids:
+        msg = client.get_messages(chat, ids=mid)
+        if msg is None or not msg.media:
+            raise RuntimeError(f"Message {mid} has no video to download")
+        paths.append(Path(client.download_media(msg, file=str(WORK / f"{mid}_raw"))))
     return paths
 
 
 def upload(chat: int, path: Path, caption: str) -> None:
-    with _client() as client:
-        client.send_file(chat, str(path), caption=caption, supports_streaming=True)
+    _client().send_file(chat, str(path), caption=caption, supports_streaming=True)
 
 
 def probe(path: Path) -> tuple[float, bool]:

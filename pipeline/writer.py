@@ -1,5 +1,8 @@
 """Gemini calls: write the title/description/tags, and route free-text messages."""
 import json
+import os
+import re
+import time
 from pathlib import Path
 
 import requests
@@ -7,20 +10,78 @@ import requests
 from . import config
 
 VOICE = Path(__file__).resolve().parent.parent / "voice.md"
+API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+TIMEOUT = 180          # seconds to wait for one Gemini reply
+ATTEMPTS = 3           # tries per model before moving to the fallback
+RETRY_STATUS = {429, 500, 502, 503, 504}
+
+
+class GeminiError(RuntimeError):
+    pass
+
+
+def models() -> list[str]:
+    """Primary model, then a lighter fallback (repo variable GEMINI_FALLBACK_MODEL)."""
+    primary = config.gemini_model()
+    fallback = os.environ.get("GEMINI_FALLBACK_MODEL") or "gemini-3.5-flash-lite"
+    return [primary] if fallback == primary else [primary, fallback]
+
+
+def extract_json(data: dict) -> dict:
+    """Pull the JSON answer out of a Gemini response, skipping thought parts."""
+    try:
+        parts = data["candidates"][0]["content"]["parts"]
+    except (KeyError, IndexError):
+        reason = (data.get("promptFeedback") or {}).get("blockReason") \
+            or (data.get("candidates") or [{}])[0].get("finishReason")
+        raise GeminiError(f"Gemini returned no answer ({reason or 'empty response'})")
+    text = "".join(p.get("text", "") for p in parts if not p.get("thought"))
+    text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip())
+    return json.loads(text)
+
+
+def _post(model: str, body: dict) -> requests.Response:
+    return requests.post(API.format(model=model), json=body, timeout=TIMEOUT,
+                         headers={"x-goog-api-key": config.gemini_key()})
 
 
 def ask_json(prompt: str) -> dict:
-    url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-           f"{config.gemini_model()}:generateContent")
-    body = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseMimeType": "application/json"},
-    }
-    r = requests.post(url, json=body, timeout=90,
-                      headers={"x-goog-api-key": config.gemini_key()})
-    r.raise_for_status()
-    text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-    return json.loads(text)
+    """Call Gemini with low thinking (fast), retrying slow or busy replies,
+    then falling back to a lighter model."""
+    errors = []
+    for model in models():
+        body = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "thinkingConfig": {"thinkingLevel": "low"},
+            },
+        }
+        for attempt in range(ATTEMPTS):
+            try:
+                r = _post(model, body)
+            except (requests.Timeout, requests.ConnectionError) as exc:
+                errors.append(f"{model}: {type(exc).__name__}")
+                time.sleep(5 * (attempt + 1))
+                continue
+            if r.status_code == 400 and "thinkingConfig" in body["generationConfig"]:
+                # Model does not accept a thinking level: drop it and retry now,
+                # through the same loop so timeouts are still caught.
+                body["generationConfig"].pop("thinkingConfig")
+                errors.append(f"{model}: HTTP 400, retrying without thinkingLevel")
+                continue
+            if r.status_code in RETRY_STATUS:
+                errors.append(f"{model}: HTTP {r.status_code}")
+                time.sleep(10 * (attempt + 1))
+                continue
+            if r.status_code != 200:
+                errors.append(f"{model}: HTTP {r.status_code} {r.text[:200]}")
+                break  # not worth retrying this model
+            try:
+                return extract_json(r.json())
+            except (GeminiError, ValueError) as exc:
+                errors.append(f"{model}: {exc}")
+    raise GeminiError("Gemini failed after retries: " + "; ".join(errors[-4:]))
 
 
 def draft_prompt(dish: str, research: str, instructions: list[str],

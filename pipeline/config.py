@@ -3,8 +3,9 @@ import os
 
 
 def env(name: str, default: str | None = None) -> str:
-    value = os.environ.get(name, default)
-    if value is None or value == "":
+    # GitHub passes unset repo variables as "", so empty also means "use default".
+    value = os.environ.get(name) or default
+    if not value:
         raise RuntimeError(f"Missing required setting: {name}")
     return value
 
@@ -29,7 +30,7 @@ def gemini_key() -> str:
 
 def gemini_model() -> str:
     # Model names change; override with the GEMINI_MODEL repo variable.
-    return env("GEMINI_MODEL", "gemini-2.5-flash")
+    return env("GEMINI_MODEL", "gemini-3.8-flash")
 
 
 def youtube_key() -> str:

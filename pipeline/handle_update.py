@@ -78,6 +78,8 @@ def process(video: dict, change_request: str = "") -> None:
             change_request, video.get("draft") if change_request else None,
         )
         video["draft_msg_id"] = tg.to_owner(format_draft(video))
+        video.setdefault("draft_history", {})[str(video["draft_msg_id"])] = video["draft"]
+        video.pop("error", None)
         video["status"] = "awaiting_approval"
     except Exception as exc:
         video["status"] = "failed"
@@ -85,7 +87,17 @@ def process(video: dict, change_request: str = "") -> None:
         state.save_video(video)
         tg.to_owner(f"Clip {video['id']} ({video.get('dish') or 'no dish'}) failed: "
                     f"{video['error']}\nSend /redo {video['id']} to retry.")
+        exc.reported = True  # owner already told; skip the generic error message
         raise
+    state.save_video(video)
+
+
+def ask_for_dish(video: dict) -> None:
+    """Ask in the group which dish a clip is; the reply is matched by ask_msg_id."""
+    video["ask_msg_id"] = tg.send(
+        video["chat"], "Which dish is this? Reply to this message with the name.",
+        reply_to=video["id"])
+    video["status"] = "awaiting_dish"
     state.save_video(video)
 
 
@@ -105,6 +117,9 @@ def new_clip(msg: dict) -> None:
             if msg["message_id"] != min(album["ids"]):
                 return
             dish, mode, parts = album_dish, "raw", album["ids"]
+        elif not dish:
+            # Finished reels in one album share the album's single caption.
+            dish = album_dish
     video = {
         "id": msg["message_id"], "chat": msg["chat"]["id"], "dish": dish,
         "mode": mode, "parts": parts, "status": "new",
@@ -116,11 +131,7 @@ def new_clip(msg: dict) -> None:
         tg.to_owner(f"Paused: clip {video['id']} is held. /resume, then /redo {video['id']}.")
         return
     if not dish:
-        video["ask_msg_id"] = tg.send(
-            video["chat"], "Which dish is this? Reply to this message with the name.",
-            reply_to=video["id"])
-        video["status"] = "awaiting_dish"
-        state.save_video(video)
+        ask_for_dish(video)
         return
     process(video)
 
@@ -143,13 +154,21 @@ def approve(video: dict) -> None:
     tg.to_owner(", ".join(d.get("tags", [])))
 
 
+def status_line(video: dict) -> str:
+    return f"{video['id']}: {video.get('dish') or '(no dish)'} - {video['status']}"
+
+
 def run_command(command: str, arg: str) -> None:
     settings = state.load_settings()
     if command == "status":
-        vids = [v for v in state.all_videos() if v["status"] != "posted"][-10:]
-        lines = [f"{v['id']}: {v.get('dish') or '(no dish)'} - {v['status']}" for v in vids]
+        vids = [v for v in state.all_videos() if v["status"] != "posted"]
+        pending = [v for v in vids if v["status"] != "approved"][-10:]
+        approved = [v for v in vids if v["status"] == "approved"][-3:]
+        lines = [status_line(v) for v in pending] or ["Nothing pending."]
+        if approved:
+            lines += ["", "Recently approved:"] + [status_line(v) for v in approved]
         paused = "PAUSED\n" if settings["paused"] else ""
-        tg.to_owner(paused + ("\n".join(lines) or "Nothing pending."))
+        tg.to_owner(paused + "\n".join(lines))
     elif command in ("pause", "resume"):
         settings["paused"] = command == "pause"
         state.save_settings(settings)
@@ -175,7 +194,9 @@ def run_command(command: str, arg: str) -> None:
         if not video:
             tg.to_owner(f"No clip with id {arg}. See /status.")
         elif not video.get("dish"):
-            tg.to_owner(f"Clip {arg} has no dish name yet.")
+            ask_for_dish(video)
+            tg.to_owner(f"Clip {arg} has no dish name. I asked in the group; "
+                        "the draft follows once someone replies there with the name.")
         else:
             video.pop("research", None)
             process(video)
@@ -193,13 +214,23 @@ def run_command(command: str, arg: str) -> None:
         tg.to_owner("I didn't understand that.\n\n" + HELP)
 
 
+def find_by_draft(msg_id: int) -> dict | None:
+    """The clip whose current or earlier draft was Telegram message msg_id."""
+    for video in state.all_videos():
+        if video.get("draft_msg_id") == msg_id or str(msg_id) in video.get("draft_history", {}):
+            return video
+    return None
+
+
 def owner_message(msg: dict) -> None:
     text = (msg.get("text") or "").strip()
     if not text:
         return
     replied = (msg.get("reply_to_message") or {}).get("message_id")
-    video = state.find_video("draft_msg_id", replied) if replied else None
+    video = find_by_draft(replied) if replied else None
     if video:
+        # Act on the version the owner replied to, even if a newer draft exists.
+        video["draft"] = video.get("draft_history", {}).get(str(replied), video["draft"])
         if text.lower().strip(" .!") in APPROVE_WORDS:
             approve(video)
         else:
@@ -230,9 +261,10 @@ def handle(update: dict) -> None:
 if __name__ == "__main__":
     try:
         handle(json.loads(os.environ["UPDATE_JSON"]))
-    except Exception:
+    except Exception as exc:
         traceback.print_exc()
         try:
-            tg.to_owner("Pipeline error: " + traceback.format_exc()[-600:])
+            if not getattr(exc, "reported", False):
+                tg.to_owner("Pipeline error: " + traceback.format_exc()[-600:])
         finally:
             raise SystemExit(1)
