@@ -1,0 +1,12 @@
+{
+  "id": 4,
+  "chat": -1004371403977,
+  "dish": "",
+  "mode": "final",
+  "parts": [
+    4
+  ],
+  "status": "awaiting_dish",
+  "received": "2026-11-20T13:22:44+00:00",
+  "ask_msg_id": 5
+}
